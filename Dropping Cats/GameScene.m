@@ -58,13 +58,12 @@
         SKNode *containerNode = [SKNode node];
         containerNode.position = CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame));
 
-        SKPhysicsBody *containerBody = [SKPhysicsBody bodyWithRectangleOfSize:containerRect.size];
-        containerBody.dynamic = NO;
+    // Create a physics boundary for the container
+        SKPhysicsBody *containerBody = [SKPhysicsBody bodyWithEdgeLoopFromRect:containerRect];
+        containerBody.categoryBitMask = 0x2; // Assign a unique category bit mask
+        containerBody.collisionBitMask = 0x1; // Enable collisions with balls (category 0x1)
+        containerBody.contactTestBitMask = 0x0; // No contact testing
         containerNode.physicsBody = containerBody;
-
-        // Set category and collision bit mask for desired interactions
-        containerBody.categoryBitMask = 0x1; // Assign relevant category
-        containerBody.collisionBitMask = 0x0; // Allow collisions with specific categories
 
         [self addChild:containerNode];
 
@@ -102,17 +101,21 @@
     SKNode *slider = [self childNodeWithName:@"slider"];
     if (!slider) return;
 
+    // Create the ball
     SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:15];
     ball.fillColor = [SKColor yellowColor];
     ball.strokeColor = [SKColor blackColor];
     ball.lineWidth = 1.5;
-    ball.position = CGPointMake(slider.position.x, slider.position.y - 50); // Adjust as needed
 
-    // Add physics body for collision
-    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:15];
+    // Set up the physics body for the ball
+    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:ball.frame.size.width / 2];
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
+    ball.physicsBody.collisionBitMask = 0x1; // Enable collision with container
+
+    // Place the ball right above the slider
+    ball.position = CGPointMake(slider.position.x, CGRectGetMaxY(self.frame) - 50);
 
     [self addChild:ball];
 }
