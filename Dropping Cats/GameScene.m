@@ -159,7 +159,6 @@
             slider.position = CGPointMake(pos.x, slider.position.y);
         }
 
-        [self spawnBallAtSliderPosition]; // Spawn a ball at the new slider position
     }
 }
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -170,7 +169,9 @@
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
-    for (UITouch *t in touches) {[self touchUpAtPoint:[t locationInNode:self]];}
+    for (UITouch *t in touches) {
+        [self touchUpAtPoint:[t locationInNode:self]]; // This will spawn the ball
+    }
 }
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {[self touchUpAtPoint:[t locationInNode:self]];}
