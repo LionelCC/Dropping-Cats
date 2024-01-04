@@ -5,6 +5,7 @@
 //  Created by Lionel Chen on 1/3/24.
 //
 
+
 #import "GameScene.h"
 
 @implementation GameScene {
@@ -16,7 +17,7 @@
 
 - (void)didMoveToView:(SKView *)view {
     // Setup your scene here
-
+    self.physicsWorld.contactDelegate = self;
     // Get label node from scene and store it for use later
     CGFloat w = (self.size.width + self.size.height) * 0.05;
     
@@ -75,13 +76,21 @@
 }
 
 
+- (void)spawnBallAtSliderPositionWithSize:(BallSize)size {
+    SKNode *slider = [self childNodeWithName:@"slider"];
+    if (!slider) return;
 
-- (void)spawnBall {
-    SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:15];
+    CGFloat radius = [self radiusForBallSize:size];
+    SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
     ball.fillColor = [SKColor yellowColor];
     ball.strokeColor = [SKColor blackColor];
     ball.lineWidth = 1.5;
-    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:ball.frame.size.width / 2];
+    ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)size];
+
+    // Set up the physics body for the ball
+    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
+    ball.physicsBody.categoryBitMask = 1 << size; // Example: 1 for BallSize1, 2 for BallSize2, etc.
+    ball.physicsBody.contactTestBitMask = 0xFFFFFFFF; // To detect collisions with all other balls
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
@@ -89,41 +98,93 @@
     ball.physicsBody.restitution = 0.5; // Adjust as needed
     ball.physicsBody.linearDamping = 0.5; // Adjust as needed
     ball.physicsBody.angularDamping = 0.5; // Adjust as needed
-    ball.physicsBody.collisionBitMask = 0x1;
+    ball.physicsBody.collisionBitMask = 0x1; // Enable collision with container
 
-
-
-    // Random position within the container bounds
-    int minX = CGRectGetMinX(self.frame) + 150 + ball.frame.size.width / 2;
-    int maxX = CGRectGetMaxX(self.frame) - 150 - ball.frame.size.width / 2;
-    int randomX = arc4random_uniform(maxX - minX) + minX;
-    ball.position = CGPointMake(randomX, CGRectGetMaxY(self.frame) - 50);
+    // Position the ball above the slider
+    ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50); // Adjust Y position as needed
 
     [self addChild:ball];
 }
 
-- (void)spawnBallAtSliderPosition {
-    SKNode *slider = [self childNodeWithName:@"slider"];
-    if (!slider) return;
 
-    // Create the ball
-    SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:15];
-    ball.fillColor = [SKColor yellowColor];
+
+- (void)spawnBallAtPosition:(CGPoint)position withSize:(BallSize)size {
+    CGFloat radius = [self radiusForBallSize:size];
+    SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
+    ball.fillColor = [self colorForBallSize:size]; // Assuming you have a method to determine color based on size
     ball.strokeColor = [SKColor blackColor];
     ball.lineWidth = 1.5;
+    ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)size];
 
     // Set up the physics body for the ball
-    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:ball.frame.size.width / 2];
+    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
-    ball.physicsBody.collisionBitMask = 0x1; // Enable collision with container
+    ball.physicsBody.friction = 0.1;
+    ball.physicsBody.restitution = 0.5;
+    ball.physicsBody.linearDamping = 0.5;
+    ball.physicsBody.angularDamping = 0.5;
+    ball.physicsBody.categoryBitMask = 1 << size;
+    ball.physicsBody.contactTestBitMask = 0xFFFFFFFF;
 
-    // Place the ball right above the slider
-    ball.position = CGPointMake(slider.position.x, CGRectGetMaxY(self.frame) - 50);
+    ball.position = position;
 
     [self addChild:ball];
 }
+
+
+
+- (void)didBeginContact:(SKPhysicsContact *)contact {
+    SKNode *nodeA = contact.bodyA.node;
+    SKNode *nodeB = contact.bodyB.node;
+
+    // Check if both nodes are balls
+    if ([nodeA.name hasPrefix:@"ball_"] && [nodeB.name hasPrefix:@"ball_"]) {
+        BallSize sizeA = [self sizeFromName:nodeA.name];
+        BallSize sizeB = [self sizeFromName:nodeB.name];
+
+        // Check if they are the same size and neither is the maximum size
+        if (sizeA == sizeB && sizeA < BallSize5) {
+            CGPoint newPosition = CGPointMake((nodeA.position.x + nodeB.position.x) / 2,
+                                              (nodeA.position.y + nodeB.position.y) / 2);
+
+            [nodeA removeFromParent];
+            [nodeB removeFromParent];
+
+            // Spawn a new ball of the next larger size
+            [self spawnBallAtPosition:newPosition withSize:sizeA + 1];
+        }
+    }
+}
+
+
+
+- (CGFloat)radiusForBallSize:(BallSize)size {
+    switch (size) {
+        case BallSize1: return 15.0;
+        case BallSize2: return 25.0;
+        case BallSize3: return 40.0;
+        case BallSize4: return 55.0;
+        case BallSize5: return 70.0;
+        // Add more sizes as needed
+    }
+}
+- (BallSize)sizeFromName:(NSString *)name {
+    NSUInteger sizeIndex = [[[name componentsSeparatedByString:@"_"] lastObject] integerValue];
+    switch (sizeIndex) {
+        case 1: return BallSize1;
+        case 2: return BallSize2;
+        case 3: return BallSize3;
+        case 4: return BallSize4;
+        case 5: return BallSize5;
+        default: return BallSize1; // Default case
+    }
+}
+
+
+
+
 
 
 
@@ -147,8 +208,8 @@
     n.position = pos;
     n.strokeColor = [SKColor redColor];
     [self addChild:n];
-    [self spawnBallAtSliderPosition]; // Spawn ball when touch is released
 }
+
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {
@@ -170,9 +231,10 @@
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {
-        [self touchUpAtPoint:[t locationInNode:self]]; // This will spawn the ball
+        [self spawnBallAtSliderPositionWithSize:BallSize1]; // Spawn ball when touch is released
     }
 }
+
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {[self touchUpAtPoint:[t locationInNode:self]];}
 }

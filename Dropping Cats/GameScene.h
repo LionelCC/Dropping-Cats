@@ -7,6 +7,15 @@
 
 #import <SpriteKit/SpriteKit.h>
 
-@interface GameScene : SKScene
+typedef NS_ENUM(NSUInteger, BallSize) {
+    BallSize1,
+    BallSize2,
+    BallSize3,
+    BallSize4,
+    BallSize5,
+    // Add more sizes as needed
+};
+
+@interface GameScene : SKScene <SKPhysicsContactDelegate>
 
 @end
