@@ -13,11 +13,17 @@
     SKShapeNode *_spinnyNode;
     SKLabelNode *_label;
     
+    
 }
 
 - (void)didMoveToView:(SKView *)view {
     // Setup your scene here
     self.physicsWorld.contactDelegate = self;
+    self.physicsBody = [SKPhysicsBody bodyWithEdgeLoopFromRect:self.frame];
+    self.physicsBody.categoryBitMask = 2; // Assuming category 2 for edges
+    static const uint32_t PhysicsCategoryBall = 0x1 << 0;
+    static const uint32_t PhysicsCategoryEdge = 0x1 << 1;
+
     // Get label node from scene and store it for use later
     CGFloat w = (self.size.width + self.size.height) * 0.05;
     
@@ -47,7 +53,7 @@
     CGPoint containerBottomLeft = CGPointMake(CGRectGetMidX(self.frame) - containerWidth / 2, CGRectGetMidY(self.frame) - containerHeight / 2);
     CGPoint containerBottomRight = CGPointMake(containerBottomLeft.x + containerWidth, containerBottomLeft.y);
     CGPoint containerTopLeft = CGPointMake(containerBottomLeft.x, containerBottomLeft.y + containerHeight);
-
+    
     // Left Edge
     SKShapeNode *leftEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, edgeThickness, containerHeight)];
     leftEdge.fillColor = [SKColor grayColor];
@@ -71,6 +77,14 @@
     bottomEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(containerWidth, 0)];
     bottomEdge.physicsBody.dynamic = NO;
     [self addChild:bottomEdge];
+    
+    // Inside didMoveToView: method where you create edges
+    leftEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
+    rightEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
+    bottomEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
+    bottomEdge.physicsBody.collisionBitMask = PhysicsCategoryBall; // Allow collisions with balls
+
+
 
 
 }
@@ -89,8 +103,9 @@
 
     // Set up the physics body for the ball
     ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
-    ball.physicsBody.categoryBitMask = 1 << size; // Example: 1 for BallSize1, 2 for BallSize2, etc.
-    ball.physicsBody.contactTestBitMask = 0xFFFFFFFF; // To detect collisions with all other balls
+    ball.physicsBody.categoryBitMask |= BallSizeMergeable; // Assuming mergeability depends on size
+    ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
+    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
@@ -98,12 +113,28 @@
     ball.physicsBody.restitution = 0.5; // Adjust as needed
     ball.physicsBody.linearDamping = 0.5; // Adjust as needed
     ball.physicsBody.angularDamping = 0.5; // Adjust as needed
-    ball.physicsBody.collisionBitMask = 0x1; // Enable collision with container
+    ball.physicsBody.collisionBitMask = 2; // Enable collision with container
+    // Inside spawnBallAtSliderPositionWithSize: and other ball-creating methods
+
 
     // Position the ball above the slider
     ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50); // Adjust Y position as needed
+    
+    
 
     [self addChild:ball];
+}
+
+- (SKColor *)colorForBallSize:(BallSize)size {
+    switch (size) {
+        case BallSize1: return [SKColor yellowColor]; // Smallest ball is yellow
+        case BallSize2: return [SKColor greenColor];
+        case BallSize3: return [SKColor blueColor];
+        case BallSize4: return [SKColor redColor];
+        case BallSize5: return [SKColor purpleColor];
+        // Add more cases as needed
+        default: return [SKColor whiteColor]; // Default color
+    }
 }
 
 
@@ -111,7 +142,8 @@
 - (void)spawnBallAtPosition:(CGPoint)position withSize:(BallSize)size {
     CGFloat radius = [self radiusForBallSize:size];
     SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
-    ball.fillColor = [self colorForBallSize:size]; // Assuming you have a method to determine color based on size
+    
+    ball.fillColor = [self colorForBallSize:size]; // Use the method to determine color
     ball.strokeColor = [SKColor blackColor];
     ball.lineWidth = 1.5;
     ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)size];
@@ -134,29 +166,54 @@
 }
 
 
-
 - (void)didBeginContact:(SKPhysicsContact *)contact {
     SKNode *nodeA = contact.bodyA.node;
     SKNode *nodeB = contact.bodyB.node;
 
+    // Enhanced Debug: Log the nodes involved in the collision and their category bit masks
+    NSLog(@"Collision detected between nodes: %@ and %@", nodeA.name, nodeB.name);
+    NSLog(@"Node A category bit mask: %u, Node B category bit mask: %u", nodeA.physicsBody.categoryBitMask, nodeB.physicsBody.categoryBitMask);
+
     // Check if both nodes are balls
-    if ([nodeA.name hasPrefix:@"ball_"] && [nodeB.name hasPrefix:@"ball_"]) {
+    BOOL isNodeABall = (nodeA.physicsBody.categoryBitMask & PhysicsCategoryBall) != 0;
+    BOOL isNodeBBall = (nodeB.physicsBody.categoryBitMask & PhysicsCategoryBall) != 0;
+
+    NSLog(@"Node A is ball: %@, Node B is ball: %@", isNodeABall ? @"YES" : @"NO", isNodeBBall ? @"YES" : @"NO");
+
+    if (isNodeABall && isNodeBBall && (nodeA.physicsBody.categoryBitMask & BallSizeMergeable) && (nodeB.physicsBody.categoryBitMask & BallSizeMergeable)) {
         BallSize sizeA = [self sizeFromName:nodeA.name];
         BallSize sizeB = [self sizeFromName:nodeB.name];
 
-        // Check if they are the same size and neither is the maximum size
+        // Debug: Log the sizes of the balls
+        NSLog(@"Sizes of colliding balls: sizeA = %lu, sizeB = %lu", (unsigned long)sizeA, (unsigned long)sizeB);
+
+        // Check for matching sizes and colors (assuming you're using a custom "color" property)
+        
         if (sizeA == sizeB && sizeA < BallSize5) {
             CGPoint newPosition = CGPointMake((nodeA.position.x + nodeB.position.x) / 2,
                                               (nodeA.position.y + nodeB.position.y) / 2);
 
+            // Debug: Log the position where the new ball will be spawned
+            NSLog(@"Merging balls. New ball will be spawned at position: %@", NSStringFromCGPoint(newPosition));
+
             [nodeA removeFromParent];
             [nodeB removeFromParent];
-
-            // Spawn a new ball of the next larger size
             [self spawnBallAtPosition:newPosition withSize:sizeA + 1];
+
+            // Debug: Log the size of the new ball
+            NSLog(@"New ball spawned with size: %lu", (unsigned long)sizeA + 1);
+        } else {
+            // Debug: Log when balls do not merge
+            NSLog(@"Balls did not merge. Either sizes are different, colors don't match, or maximum size reached.");
         }
+    } else {
+        // Debug: Log if the collision is not between two balls
+        NSLog(@"Collision not between two balls. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
     }
 }
+
+
+
 
 
 
@@ -167,6 +224,9 @@
         case BallSize3: return 40.0;
         case BallSize4: return 55.0;
         case BallSize5: return 70.0;
+            
+        case BallSizeMergeable: return 0.0; // Or any appropriate value for mergeable balls
+
         // Add more sizes as needed
     }
 }
