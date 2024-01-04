@@ -31,41 +31,46 @@
                                                 [SKAction removeFromParent],
                                                 ]]];
     
-    // Create a boundary container
-        CGRect containerRect = CGRectMake(0, -100, 450, 950);  // Origin at (0, 0)
-        SKShapeNode *container = [SKShapeNode shapeNodeWithRect:containerRect cornerRadius:10];
-        container.strokeColor = [SKColor whiteColor];
-        container.lineWidth = 4.0;
-        container.position = CGPointMake(CGRectGetMidX(self.frame) - containerRect.size.width / 2, CGRectGetMidY(self.frame) - containerRect.size.height / 2);
-    
-    
-        // Add physics body to the container
-        container.physicsBody = [SKPhysicsBody bodyWithRectangleOfSize:containerRect.size];
-        container.physicsBody.dynamic = NO;
-    
-    
-        [self addChild:container];
     
     // Create a simple slider
-        SKShapeNode *slider = [SKShapeNode shapeNodeWithRectOfSize:CGSizeMake(100, 20)];
-        slider.fillColor = [SKColor grayColor];
-        slider.name = @"slider"; // Important for identifying the node in touch events
-    // Adjust the Y position so the slider is above the container
-        slider.position = CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame) + 450);
-        [self addChild:slider];
+    SKShapeNode *slider = [SKShapeNode shapeNodeWithRectOfSize:CGSizeMake(100, 20)];
+    slider.fillColor = [SKColor grayColor];
+    slider.name = @"slider"; // Important for identifying the node in touch events
+    slider.position = CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame) + 450);
+    [self addChild:slider];
     
-        // Create a single container node with physics body
-        SKNode *containerNode = [SKNode node];
-        containerNode.position = CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame));
+    /// Calculate container dimensions and positions
+    CGFloat edgeThickness = 4.0; // Adjust the thickness of the edge as needed
+    CGFloat containerWidth = 450.0;
+    CGFloat containerHeight = 950.0;
+    CGPoint containerBottomLeft = CGPointMake(CGRectGetMidX(self.frame) - containerWidth / 2, CGRectGetMidY(self.frame) - containerHeight / 2);
+    CGPoint containerBottomRight = CGPointMake(containerBottomLeft.x + containerWidth, containerBottomLeft.y);
+    CGPoint containerTopLeft = CGPointMake(containerBottomLeft.x, containerBottomLeft.y + containerHeight);
 
-    // Create a physics boundary for the container
-        SKPhysicsBody *containerBody = [SKPhysicsBody bodyWithEdgeLoopFromRect:containerRect];
-        containerBody.categoryBitMask = 0x2; // Assign a unique category bit mask
-        containerBody.collisionBitMask = 0x1; // Enable collisions with balls (category 0x1)
-        containerBody.contactTestBitMask = 0x0; // No contact testing
-        containerNode.physicsBody = containerBody;
+    // Left Edge
+    SKShapeNode *leftEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, edgeThickness, containerHeight)];
+    leftEdge.fillColor = [SKColor grayColor];
+    leftEdge.position = containerBottomLeft;
+    leftEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(0, containerHeight)];
+    leftEdge.physicsBody.dynamic = NO;
+    [self addChild:leftEdge];
 
-        [self addChild:containerNode];
+    // Right Edge
+    SKShapeNode *rightEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, edgeThickness, containerHeight)];
+    rightEdge.fillColor = [SKColor grayColor];
+    rightEdge.position = CGPointMake(containerBottomRight.x - edgeThickness, containerBottomRight.y);
+    rightEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(0, containerHeight)];
+    rightEdge.physicsBody.dynamic = NO;
+    [self addChild:rightEdge];
+
+    // Bottom Edge
+    SKShapeNode *bottomEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, containerWidth, edgeThickness)];
+    bottomEdge.fillColor = [SKColor grayColor];
+    bottomEdge.position = containerBottomLeft;
+    bottomEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(containerWidth, 0)];
+    bottomEdge.physicsBody.dynamic = NO;
+    [self addChild:bottomEdge];
+
 
 }
 
