@@ -7,6 +7,8 @@
 
 
 #import "GameScene.h"
+#import <Foundation/Foundation.h>
+
 
 static const uint32_t PhysicsCategoryBallSize1 = 0x1 << 1;
 static const uint32_t PhysicsCategoryBallSize2 = 0x1 << 2;
@@ -69,6 +71,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     leftEdge.position = containerBottomLeft;
     leftEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(0, containerHeight)];
     leftEdge.physicsBody.dynamic = NO;
+    leftEdge.name = @"leftEdge";
     [self addChild:leftEdge];
 
     // Right Edge
@@ -77,6 +80,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     rightEdge.position = CGPointMake(containerBottomRight.x - edgeThickness, containerBottomRight.y);
     rightEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(0, containerHeight)];
     rightEdge.physicsBody.dynamic = NO;
+    rightEdge.name = @"rightEdge";
     [self addChild:rightEdge];
 
     // Bottom Edge
@@ -85,7 +89,11 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     bottomEdge.position = containerBottomLeft;
     bottomEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(containerWidth, 0)];
     bottomEdge.physicsBody.dynamic = NO;
+    bottomEdge.physicsBody.contactTestBitMask = 0; // Set the property on the physics body
+    bottomEdge.name = @"bottomEdge";
+
     [self addChild:bottomEdge];
+
     
     // Inside didMoveToView: method where you create edges
     leftEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
@@ -121,7 +129,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         // ... and so on for other sizes
     }
     ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
-    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
+    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge | PhysicsCategoryBallSize1;
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
@@ -197,8 +205,14 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     SKNode *nodeA = contact.bodyA.node;
     SKNode *nodeB = contact.bodyB.node;
 
-    // Check if both nodes are balls and have the BallSizeMergeable category
-    if  ([self isBall:nodeA] && [self isBall:nodeB]) {
+    NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeA.name, (unsigned long)nodeA.physicsBody.categoryBitMask, (unsigned long)nodeA.physicsBody.contactTestBitMask);
+    NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeB.name, (unsigned long)nodeB.physicsBody.categoryBitMask, (unsigned long)nodeB.physicsBody.contactTestBitMask);
+
+
+
+
+    if ([self isBall:nodeA] && [self isBall:nodeB] && nodeA.physicsBody.categoryBitMask == nodeB.physicsBody.categoryBitMask) {
+
 
         BallSize sizeA = [self sizeFromName:nodeA.name];
         BallSize sizeB = [self sizeFromName:nodeB.name];
@@ -241,9 +255,13 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 }
 - (BOOL)isBall:(SKNode *)node {
     uint32_t bitmask = node.physicsBody.categoryBitMask;
-    return (bitmask == PhysicsCategoryBallSize1 || bitmask == PhysicsCategoryBallSize2 || bitmask == PhysicsCategoryBallSize3 || bitmask == PhysicsCategoryBallSize4 || bitmask == PhysicsCategoryBallSize5);
+    return (bitmask == PhysicsCategoryBallSize1 ||
+            bitmask == PhysicsCategoryBallSize2 ||
+            bitmask == PhysicsCategoryBallSize3 ||
+            bitmask == PhysicsCategoryBallSize4 ||
+            bitmask == PhysicsCategoryBallSize5) &&
+           node.physicsBody.contactTestBitMask != 0;
 }
-
 
 
 - (void)mergeBalls:(SKNode *)nodeA withBall:(SKNode *)nodeB intoSize:(BallSize)newSize {
