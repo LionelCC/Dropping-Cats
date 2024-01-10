@@ -27,4 +27,9 @@ typedef NS_ENUM(uint32_t, PhysicsCategory) {
 
 @interface GameScene : SKScene <SKPhysicsContactDelegate>
 
+@property (nonatomic, strong) NSMutableArray *unlockedBallSizes;
+@property (nonatomic, strong) NSArray *ballSpawnProbabilities;  
+
+
+
 @end

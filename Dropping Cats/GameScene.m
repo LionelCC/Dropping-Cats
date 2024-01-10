@@ -23,8 +23,10 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     
     SKShapeNode *_spinnyNode;
     SKLabelNode *_label;
-    
+    BallSize largestUnlockedSize;
+
 }
+
 
 - (void)didMoveToView:(SKView *)view {
     // Setup your scene here
@@ -35,6 +37,24 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     static const uint32_t PhysicsCategoryEdge = 0x1 << 1;
 
 
+
+    
+    // Initialization code moved here
+    if (!self.unlockedBallSizes) {
+        self.unlockedBallSizes = [NSMutableArray arrayWithObject:@(BallSize1)];
+        NSLog(@"Unlocked ball sizes initialized as: %@", self.unlockedBallSizes);
+    }
+
+    if (!self.ballSpawnProbabilities) {
+        self.ballSpawnProbabilities = @[@0.5, @0.3, @0.2]; // Example probabilities
+        NSLog(@"Ball spawn probabilities initialized as: %@", self.ballSpawnProbabilities);
+    }
+
+    // ... other initialization code, such as setting up the scene ...
+
+    NSLog(@"GameScene didMoveToView: method called");
+    
+    
     // Get label node from scene and store it for use later
     CGFloat w = (self.size.width + self.size.height) * 0.05;
     
@@ -106,21 +126,24 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 
 - (void)spawnBallAtSliderPositionWithSize:(BallSize)size {
     SKNode *slider = [self childNodeWithName:@"slider"];
-    
-    NSLog(@"Spawning ball of size: %lu", (unsigned long)size);
-
     if (!slider) return;
 
-    CGFloat radius = [self radiusForBallSize:size];
+    // Update ballSpawnProbabilities dynamically based on unlocked sizes
+    [self updateBallSpawnProbabilities];
+
+    // Determine the size of the ball to spawn
+    BallSize sizeToSpawn = [self determineBallSizeToSpawn];
+    
+    CGFloat radius = [self radiusForBallSize:sizeToSpawn];
     SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
-    ball.fillColor = [self colorForBallSize:size];
+    ball.fillColor = [self colorForBallSize:sizeToSpawn];
     ball.strokeColor = [SKColor blackColor];
     ball.lineWidth = 1.5;
-    ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)size];
+    ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)sizeToSpawn];
 
     // Set up the physics body for the ball
     ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
-    switch (size) {
+    switch (sizeToSpawn) {
         case BallSize1: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize1; break;
         case BallSize2: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize2; break;
         case BallSize3: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize3; break;
@@ -129,7 +152,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         // ... and so on for other sizes
     }
     ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
-    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge | PhysicsCategoryBallSize1;
+    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
     ball.physicsBody.dynamic = YES;
     ball.physicsBody.affectedByGravity = YES;
     ball.physicsBody.allowsRotation = YES;
@@ -137,16 +160,72 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     ball.physicsBody.restitution = 0.5; // Adjust as needed
     ball.physicsBody.linearDamping = 0.5; // Adjust as needed
     ball.physicsBody.angularDamping = 0.5; // Adjust as needed
-    // Inside spawnBallAtSliderPositionWithSize: and other ball-creating methods
-
 
     // Position the ball above the slider
     ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50); // Adjust Y position as needed
 
-    
-
     [self addChild:ball];
 }
+
+
+
+- (BallSize)determineBallSizeToSpawn {
+    double randomValue = ((double)arc4random() / UINT32_MAX); // Normalized random value [0, 1]
+
+    double accumulatedProbability = 0.0;
+    for (NSUInteger i = 0; i < self.ballSpawnProbabilities.count; i++) {
+        NSNumber *probability = self.ballSpawnProbabilities[i];
+        accumulatedProbability += probability.doubleValue;
+
+        if (randomValue <= accumulatedProbability) {
+            BallSize potentialSize = i + 1; // Assuming BallSize enum starts at 1
+            if ([self.unlockedBallSizes containsObject:@(potentialSize)]) {
+                return potentialSize;
+            }
+        }
+    }
+
+    return BallSize1; // Fallback to BallSize1
+}
+- (void)updateBallSpawnProbabilities {
+    NSUInteger numUnlockedSizes = self.unlockedBallSizes.count;
+
+    if (numUnlockedSizes == 0) {
+        NSLog(@"(Initial state) No unlocked ball sizes yet, but updating probabilities for consistency.");
+    } else {
+        NSLog(@"Updating ball spawn probabilities based on %lu unlocked sizes: %@", (unsigned long)numUnlockedSizes, self.unlockedBallSizes);
+    }
+
+    NSMutableArray *updatedProbabilities = [NSMutableArray arrayWithCapacity:numUnlockedSizes];
+    double totalProbability = 1.0;
+    double decrementAmount = 0.1; // Adjust this value to control how much less likely larger sizes are
+
+    // Track probabilities being generated
+    for (NSUInteger i = 0; i < numUnlockedSizes; i++) {
+        double probabilityForSize = totalProbability - (decrementAmount * i);
+        [updatedProbabilities addObject:@(probabilityForSize)];
+        NSLog(@"Generated probability for size %lu: %f", (unsigned long)i, probabilityForSize);
+    }
+
+    // Inspect updatedProbabilities before assignment
+    NSLog(@"Probabilities before normalization: %@", updatedProbabilities);
+
+    // Normalize probabilities to sum up to 1.0
+    double sum = [[updatedProbabilities valueForKeyPath:@"@sum.self"] doubleValue];
+    for (NSUInteger i = 0; i < updatedProbabilities.count; i++) {
+        double normalizedProbability = [updatedProbabilities[i] doubleValue] / sum;
+        updatedProbabilities[i] = @(normalizedProbability);
+    }
+
+    // Inspect normalized probabilities
+    NSLog(@"Probabilities after normalization: %@", updatedProbabilities);
+
+    NSLog(@"Updated ball spawn probabilities: %@", self.ballSpawnProbabilities);
+    self.ballSpawnProbabilities = updatedProbabilities;
+}
+
+
+
 
 - (SKColor *)colorForBallSize:(BallSize)size {
     switch (size) {
@@ -205,11 +284,8 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     SKNode *nodeA = contact.bodyA.node;
     SKNode *nodeB = contact.bodyB.node;
 
-    NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeA.name, (unsigned long)nodeA.physicsBody.categoryBitMask, (unsigned long)nodeA.physicsBody.contactTestBitMask);
-    NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeB.name, (unsigned long)nodeB.physicsBody.categoryBitMask, (unsigned long)nodeB.physicsBody.contactTestBitMask);
-
-
-
+    //NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeA.name, (unsigned long)nodeA.physicsBody.categoryBitMask, (unsigned long)nodeA.physicsBody.contactTestBitMask);
+    //NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeB.name, (unsigned long)nodeB.physicsBody.categoryBitMask, (unsigned long)nodeB.physicsBody.contactTestBitMask);
 
     if ([self isBall:nodeA] && [self isBall:nodeB] && nodeA.physicsBody.categoryBitMask == nodeB.physicsBody.categoryBitMask) {
 
@@ -218,41 +294,43 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         BallSize sizeB = [self sizeFromName:nodeB.name];
         
         NSLog(@"Here comes %@ and %@ making contact", nodeA.name, nodeB.name);
+        
+        BallSize mergedSize = MAX(sizeA, sizeB) + 1;  // Assuming consecutive sizes
 
         // Merge BallSize1 balls
         if (sizeA == BallSize1 && sizeB == BallSize1) {
-            [self mergeBalls:nodeA withBall:nodeB intoSize:BallSize2];
+            [self mergeBalls:nodeA withBall:nodeB intoSize:mergedSize mergedSize:mergedSize];
             NSLog(@"balls merging into size 2. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
         }
 
         // Merge BallSize2 balls
         else if (sizeA == BallSize2 && sizeB == BallSize2) {
-            [self mergeBalls:nodeA withBall:nodeB intoSize:BallSize3];
+            [self mergeBalls:nodeA withBall:nodeB intoSize:mergedSize mergedSize:mergedSize];
             NSLog(@"balls merging into size 3. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
         }
         
         else if (sizeA == BallSize3 && sizeB == BallSize3) {
-            [self mergeBalls:nodeA withBall:nodeB intoSize:BallSize4];
+            [self mergeBalls:nodeA withBall:nodeB intoSize:mergedSize mergedSize:mergedSize];
             NSLog(@"balls merging into size 4. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
         }
         
         else if (sizeA == BallSize4 && sizeB == BallSize4) {
-            [self mergeBalls:nodeA withBall:nodeB intoSize:BallSize5];
+            [self mergeBalls:nodeA withBall:nodeB intoSize:mergedSize mergedSize:mergedSize];
             NSLog(@"balls merging into size 5. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
         }
         
-    
-        // Add more `if` statements for other size combinations if needed
-
-        // Log when balls do not merge
         else {
             NSLog(@"Balls did not merge. Sizes: %lu and %lu", (unsigned long)sizeA, (unsigned long)sizeB);
         }
+    } else if ([nodeA.name isEqualToString:@"bottomEdge"] || [nodeB.name isEqualToString:@"bottomEdge"]) {
+        NSLog(@"Ball collided with edge.");
+        return; // Skip further processing for edge collisions
     } else {
         // Log if the collision is not between two mergeable balls
         NSLog(@"Collision not between two mergeable balls. Nodes involved: %@ and %@", nodeA.name, nodeB.name);
     }
 }
+
 - (BOOL)isBall:(SKNode *)node {
     uint32_t bitmask = node.physicsBody.categoryBitMask;
     return (bitmask == PhysicsCategoryBallSize1 ||
@@ -264,11 +342,30 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 }
 
 
-- (void)mergeBalls:(SKNode *)nodeA withBall:(SKNode *)nodeB intoSize:(BallSize)newSize {
+- (void)mergeBalls:(SKNode *)nodeA withBall:(SKNode *)nodeB intoSize:(BallSize)newSize mergedSize:(BallSize)mergedSize {
     CGPoint newPosition = CGPointMake((nodeA.position.x + nodeB.position.x) / 2,
-                                      (nodeA.position.y + nodeB.position.y) / 2);
+                                           (nodeA.position.y + nodeB.position.y) / 2);
     [nodeA removeFromParent];
     [nodeB removeFromParent];
+
+    BOOL isNewSizeUnlocked = NO;
+    NSNumber *newSizeNumber = @(mergedSize);
+
+    // Log current unlocked sizes before potential addition
+    NSLog(@"Current unlocked sizes before merge: %@", self.unlockedBallSizes);
+
+    if (![self.unlockedBallSizes containsObject:newSizeNumber]) {
+        [self.unlockedBallSizes addObject:newSizeNumber];
+        NSLog(@"Added new size %@ to unlocked ball sizes: %@", @(mergedSize), self.unlockedBallSizes);
+
+        isNewSizeUnlocked = YES;
+        NSLog(@"Unlocked new size: %@", newSizeNumber);
+    } else {
+        NSLog(@"Size %@ already unlocked.", newSizeNumber);
+    }
+
+    // **New logging for verification**
+    NSLog(@"Unlocked ball sizes after adding new size: %@", self.unlockedBallSizes);
 
     // Create the new ball with the appropriate category bit mask
     SKShapeNode *newBall = [self spawnBallAtPosition:newPosition withSize:newSize];
@@ -280,10 +377,19 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         case BallSize5: newBall.physicsBody.categoryBitMask = PhysicsCategoryBallSize5; break;
         // ... and so on for other sizes
     }
+
+    // Check if newBall already has a parent
+    if (!newBall.parent) {
+        [self addChild:newBall];
+    }
+
+    NSLog(@"hmmmm can the mergeball function get to the statement below??!?!");
+    // Update probabilities if a new size was unlocked
+    if (isNewSizeUnlocked) {
+        NSLog(@"OH WOWOWWW YES IT CANNNN??!?!");
+        [self updateBallSpawnProbabilities];
+    }
 }
-
-
-
 
 
 
@@ -311,11 +417,6 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         default: return BallSize1; // Default case
     }
 }
-
-
-
-
-
 
 
 - (void)touchDownAtPoint:(CGPoint)pos {
