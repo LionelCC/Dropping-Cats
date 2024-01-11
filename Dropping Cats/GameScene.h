@@ -27,5 +27,9 @@ typedef NS_ENUM(uint32_t, PhysicsCategory) {
 @property (nonatomic, strong) NSMutableArray *unlockedBallSizes;
 @property (nonatomic, strong) NSArray *ballSpawnProbabilities;
 @property (nonatomic) NSTimeInterval lastSpawnTime;  // New property for cooldown
+@property (nonatomic, assign) CGFloat leftBoundary;
+@property (nonatomic, assign) CGFloat rightBoundary;
+@property (nonatomic, assign) CGFloat containerHeight;
+- (void)updateDashedLineForSlider:(SKNode *)slider withContainerHeight:(CGFloat)containerHeight;
 
 @end

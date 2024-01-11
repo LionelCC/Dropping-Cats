@@ -33,6 +33,8 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     self.physicsWorld.contactDelegate = self;
     self.physicsBody = [SKPhysicsBody bodyWithEdgeLoopFromRect:self.frame];
     self.physicsBody.categoryBitMask = 2; // Assuming category 2 for edges
+    self.containerHeight = 950.0;
+
     static const uint32_t PhysicsCategoryBall = 0x1 << 0;
     static const uint32_t PhysicsCategoryEdge = 0x1 << 1;
 
@@ -77,6 +79,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     
     CGFloat edgeThickness = 10.0;
     CGFloat containerHeight = 950.0;
+    
 
     // Log the width of the screen
     NSLog(@"Screen width: %f", self.frame.size.width);
@@ -84,7 +87,16 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     // Adjust the positions for the left and right edges
     CGPoint containerBottomLeft = CGPointMake(-250, CGRectGetMidY(self.frame) - containerHeight / 2);
     CGPoint containerBottomRight = CGPointMake(250, CGRectGetMidY(self.frame) - containerHeight / 2);
+    
+    CGFloat screenWidth = 600; // Adjusted screen width
     CGFloat containerWidth = containerBottomRight.x - containerBottomLeft.x;
+    self.leftBoundary = containerBottomLeft.x + slider.frame.size.width / 2;
+   self.rightBoundary = containerBottomRight.x - slider.frame.size.width / 2;
+
+   // Initial call to draw the dashed line
+    [self updateDashedLineForSlider:slider withContainerHeight:containerHeight];
+
+    
 
     
     // Log the width of the container
@@ -155,64 +167,52 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     if(currentTime - _lastSpawnTime >= 1.0){
         _lastSpawnTime = currentTime;
         SKNode *slider = [self childNodeWithName:@"slider"];
-            if (!slider) return;
+        if (!slider) return;
 
-            [self updateBallSpawnProbabilities];
+        [self updateBallSpawnProbabilities];
 
-            BallSize sizeToSpawn = [self determineBallSizeToSpawn];
-            CGFloat radius = [self radiusForBallSize:sizeToSpawn];
-            SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
+        BallSize sizeToSpawn = [self determineBallSizeToSpawn];
+        CGFloat radius = [self radiusForBallSize:sizeToSpawn];
+        SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
 
-            CGFloat area = M_PI * radius * radius;
-            CGFloat baseDensity = 1.5; // Base density for the smallest ball
-            CGFloat densityMultiplier = 1.0 + (sizeToSpawn - 1) * 0.5; // Increase density for larger balls
+        CGFloat area = M_PI * radius * radius;
+        CGFloat baseDensity = 1.5; // Base density for the smallest ball
+        CGFloat densityMultiplier = pow(2, sizeToSpawn - 1); // Exponential increase in density for larger balls
 
-            ball.fillColor = [self colorForBallSize:sizeToSpawn];
-            ball.strokeColor = [SKColor blackColor];
-            ball.lineWidth = 1.5;
-            ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)sizeToSpawn];
+        ball.fillColor = [self colorForBallSize:sizeToSpawn];
+        ball.strokeColor = [SKColor blackColor];
+        ball.lineWidth = 1.5;
+        ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)sizeToSpawn];
 
-            ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
-            ball.physicsBody.mass = area * baseDensity * densityMultiplier;
-            ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize1 << (sizeToSpawn - 1);
-            ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
-            ball.physicsBody.contactTestBitMask = ball.physicsBody.categoryBitMask | PhysicsCategoryEdge;
-            ball.physicsBody.dynamic = YES;
-            ball.physicsBody.affectedByGravity = YES;
-            ball.physicsBody.allowsRotation = YES;
-            ball.physicsBody.usesPreciseCollisionDetection = YES;
+        ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
+        ball.physicsBody.mass = area * baseDensity * densityMultiplier; // Mass increases exponentially with size
+        ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize1 << (sizeToSpawn - 1);
+        ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
+        ball.physicsBody.contactTestBitMask = ball.physicsBody.categoryBitMask | PhysicsCategoryEdge;
+        ball.physicsBody.dynamic = YES;
+        ball.physicsBody.affectedByGravity = YES;
+        ball.physicsBody.allowsRotation = YES;
+        ball.physicsBody.usesPreciseCollisionDetection = YES;
 
-            // Adjust physics properties based on size
-            if (sizeToSpawn == BallSize1) {
-                ball.physicsBody.friction = 0.5; // Higher friction for rolling
-                ball.physicsBody.restitution = 0.4; // Lower restitution to reduce bounciness
-                ball.physicsBody.linearDamping = 0.2; // Adjust linear damping
-                ball.physicsBody.angularDamping = 0.01; // Adjust angular damping for better rolling
+        // Adjust physics properties based on size
+        if (sizeToSpawn == BallSize1) {
+            ball.physicsBody.friction = 0.5; // Higher friction for rolling
+            ball.physicsBody.restitution = 0.4; // Lower restitution to reduce bounciness
+            ball.physicsBody.linearDamping = 0.1; // Lower linear damping for faster falling
+            ball.physicsBody.angularDamping = 0.01; // Lower angular damping for better rolling
+        } else {
+            ball.physicsBody.friction = 0.05; // Lower friction
+            ball.physicsBody.restitution = 0.3; // Lower restitution
+            ball.physicsBody.linearDamping = 0.5 + (sizeToSpawn - 1) * 0.1; // Exponentially higher linear damping
+            ball.physicsBody.angularDamping = 0.2; // Higher angular damping
+        }
 
-                // Add a small random impulse to size 1 balls when they make contact with the bottom edge
-                __weak typeof(ball) weakBall = ball;
-                ball.physicsBody.contactTestBitMask |= PhysicsCategoryEdge; // Ensure we get notifications for edge contacts
-                ball.physicsBody.collisionBitMask |= PhysicsCategoryEdge; // Collide with the edge
-
-                [ball.physicsBody setContactTestBitMask:PhysicsCategoryEdge];
-                [ball.physicsBody setCollisionBitMask:PhysicsCategoryEdge];
-                [ball.physicsBody setUsesPreciseCollisionDetection:YES];
-                
-                ball.physicsBody.contactTestBitMask = PhysicsCategoryEdge;
-                ball.physicsBody.collisionBitMask = PhysicsCategoryEdge;
-
-            } else {
-                ball.physicsBody.friction = 0.05; // Lower friction
-                ball.physicsBody.restitution = 0.3; // Lower restitution
-                ball.physicsBody.linearDamping = 0.5; // Higher linear damping
-                ball.physicsBody.angularDamping = 0.2; // Higher angular damping
-            }
-
-            ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50);
-            [self addChild:ball];
-        
+        ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50);
+        [self addChild:ball];
     }
 }
+
+
 
 
 
@@ -496,20 +496,53 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {
         CGPoint pos = [t locationInNode:self];
+        SKNode *slider = [self childNodeWithName:@"slider"];
+        
+        if (slider) {
+            // Limit the slider's x-position within the predefined boundaries
+            CGFloat newXPosition = MAX(self.leftBoundary, MIN(pos.x, self.rightBoundary));
+            slider.position = CGPointMake(newXPosition, slider.position.y);
 
+            // Update the dashed line position
+            [self updateDashedLineForSlider:slider withContainerHeight:self.containerHeight];
+        }
+    }
+}
+
+- (void)updateDashedLineForSlider:(SKNode *)slider withContainerHeight:(CGFloat)containerHeight {
+    // Remove existing dashed line
+    [self enumerateChildNodesWithName:@"dashedLine" usingBlock:^(SKNode *node, BOOL *stop) {
+        [node removeFromParent];
+    }];
+
+    CGFloat dashLength = 5;
+    CGFloat dashGap = 3;
+    CGFloat lineStartY = slider.position.y - slider.frame.size.height / 2;
+
+    for (CGFloat y = lineStartY; y > lineStartY - containerHeight; y -= (dashLength + dashGap)) {
+        SKShapeNode *dash = [SKShapeNode shapeNodeWithRect:CGRectMake(-0.5, 0, 1, dashLength) cornerRadius:0];
+        dash.position = CGPointMake(slider.position.x, y);
+        dash.fillColor = [SKColor whiteColor];
+        dash.name = @"dashedLine";
+        [self addChild:dash];
+    }
+}
+
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    for (UITouch *touch in touches) {
+        CGPoint location = [touch locationInNode:self];
         SKNode *slider = [self childNodeWithName:@"slider"];
         if (slider) {
-            slider.position = CGPointMake(pos.x, slider.position.y);
-        }
+            CGFloat newXPosition = MAX(self.leftBoundary, MIN(location.x, self.rightBoundary));
+            slider.position = CGPointMake(newXPosition, slider.position.y);
 
+            // Update the dashed line position
+            [self updateDashedLineForSlider:slider withContainerHeight:self.containerHeight];
+        }
     }
 }
-- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-    for (UITouch *t in touches) {
-        CGPoint pos = [t locationInNode:self];
-        [self touchMovedToPoint:pos];
-    }
-}
+
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
     for (UITouch *t in touches) {
