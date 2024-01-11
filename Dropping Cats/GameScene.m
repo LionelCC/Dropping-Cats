@@ -37,8 +37,6 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     static const uint32_t PhysicsCategoryEdge = 0x1 << 1;
 
 
-
-    
     // Initialization code moved here
     if (!self.unlockedBallSizes) {
         self.unlockedBallSizes = [NSMutableArray arrayWithObject:@(BallSize1)];
@@ -51,7 +49,8 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     }
 
     // ... other initialization code, such as setting up the scene ...
-
+    self.lastSpawnTime = 0;
+    
     NSLog(@"GameScene didMoveToView: method called");
     
     
@@ -69,7 +68,6 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
                                                 [SKAction removeFromParent],
                                                 ]]];
     
-    
     // Create a simple slider
     SKShapeNode *slider = [SKShapeNode shapeNodeWithRectOfSize:CGSizeMake(100, 20)];
     slider.fillColor = [SKColor grayColor];
@@ -77,14 +75,25 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     slider.position = CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame) + 450);
     [self addChild:slider];
     
-    /// Calculate container dimensions and positions
-    CGFloat edgeThickness = 4.0; // Adjust the thickness of the edge as needed
-    CGFloat containerWidth = 450.0;
+    CGFloat edgeThickness = 10.0;
     CGFloat containerHeight = 950.0;
-    CGPoint containerBottomLeft = CGPointMake(CGRectGetMidX(self.frame) - containerWidth / 2, CGRectGetMidY(self.frame) - containerHeight / 2);
-    CGPoint containerBottomRight = CGPointMake(containerBottomLeft.x + containerWidth, containerBottomLeft.y);
-    CGPoint containerTopLeft = CGPointMake(containerBottomLeft.x, containerBottomLeft.y + containerHeight);
+
+    // Log the width of the screen
+    NSLog(@"Screen width: %f", self.frame.size.width);
     
+    // Adjust the positions for the left and right edges
+    CGPoint containerBottomLeft = CGPointMake(-250, CGRectGetMidY(self.frame) - containerHeight / 2);
+    CGPoint containerBottomRight = CGPointMake(250, CGRectGetMidY(self.frame) - containerHeight / 2);
+    CGFloat containerWidth = containerBottomRight.x - containerBottomLeft.x;
+
+    
+    // Log the width of the container
+    NSLog(@"Container width: %f", containerWidth);
+
+    // Log positions of the left and right edges
+    NSLog(@"Left edge position: (%f, %f)", containerBottomLeft.x, containerBottomLeft.y);
+    NSLog(@"Right edge position: (%f, %f)", containerBottomRight.x, containerBottomRight.y);
+
     // Left Edge
     SKShapeNode *leftEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, edgeThickness, containerHeight)];
     leftEdge.fillColor = [SKColor grayColor];
@@ -104,67 +113,105 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     [self addChild:rightEdge];
 
     // Bottom Edge
-    SKShapeNode *bottomEdge = [SKShapeNode shapeNodeWithRect:CGRectMake(0, 0, containerWidth, edgeThickness)];
+    SKShapeNode *bottomEdge = [SKShapeNode shapeNodeWithRectOfSize:CGSizeMake(containerWidth, edgeThickness)];
     bottomEdge.fillColor = [SKColor grayColor];
-    bottomEdge.position = containerBottomLeft;
-    bottomEdge.physicsBody = [SKPhysicsBody bodyWithEdgeFromPoint:CGPointZero toPoint:CGPointMake(containerWidth, 0)];
+    CGPoint bottomEdgePosition = CGPointMake((containerBottomLeft.x + containerBottomRight.x) / 2, containerBottomLeft.y);
+    bottomEdge.position = bottomEdgePosition;
+    
+    bottomEdge.physicsBody = [SKPhysicsBody bodyWithRectangleOfSize:CGSizeMake(containerWidth, edgeThickness) center:CGPointZero];
     bottomEdge.physicsBody.dynamic = NO;
-    bottomEdge.physicsBody.contactTestBitMask = 0; // Set the property on the physics body
+    bottomEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
+    bottomEdge.physicsBody.collisionBitMask = PhysicsCategoryBall;
+    bottomEdge.physicsBody.contactTestBitMask = 0;
     bottomEdge.name = @"bottomEdge";
-
+    
     [self addChild:bottomEdge];
 
-    
-    // Inside didMoveToView: method where you create edges
+    // Set the category bit mask for left and right edges
     leftEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
     rightEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
-    bottomEdge.physicsBody.categoryBitMask = PhysicsCategoryEdge;
-    bottomEdge.physicsBody.collisionBitMask = PhysicsCategoryBall; // Allow collisions with balls
+    
+    
+    // Create an invisible barrier node
+    SKNode *invisibleBarrier = [SKNode node];
+    CGFloat barrierHeight = 10.0; // Height of the barrier
 
+    // Position it just above the bottom edge
+    invisibleBarrier.position = CGPointMake(CGRectGetMidX(self.frame), bottomEdge.position.y + edgeThickness / 2 + barrierHeight / 2);
+
+    // Set up the physics body for the invisible barrier
+    invisibleBarrier.physicsBody = [SKPhysicsBody bodyWithRectangleOfSize:CGSizeMake(containerWidth, barrierHeight) center:CGPointZero];
+    invisibleBarrier.physicsBody.dynamic = NO;
+    invisibleBarrier.physicsBody.categoryBitMask = PhysicsCategoryEdge; // Same category as the edge
+    invisibleBarrier.physicsBody.collisionBitMask = PhysicsCategoryBall;
+    invisibleBarrier.physicsBody.contactTestBitMask = 0;
+
+    [self addChild:invisibleBarrier];
 }
 
 
 - (void)spawnBallAtSliderPositionWithSize:(BallSize)size {
-    SKNode *slider = [self childNodeWithName:@"slider"];
-    if (!slider) return;
+    NSTimeInterval currentTime = [NSDate timeIntervalSinceReferenceDate];
+    if(currentTime - _lastSpawnTime >= 1.0){
+        _lastSpawnTime = currentTime;
+        SKNode *slider = [self childNodeWithName:@"slider"];
+            if (!slider) return;
 
-    // Update ballSpawnProbabilities dynamically based on unlocked sizes
-    [self updateBallSpawnProbabilities];
+            [self updateBallSpawnProbabilities];
 
-    // Determine the size of the ball to spawn
-    BallSize sizeToSpawn = [self determineBallSizeToSpawn];
-    
-    CGFloat radius = [self radiusForBallSize:sizeToSpawn];
-    SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
-    ball.fillColor = [self colorForBallSize:sizeToSpawn];
-    ball.strokeColor = [SKColor blackColor];
-    ball.lineWidth = 1.5;
-    ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)sizeToSpawn];
+            BallSize sizeToSpawn = [self determineBallSizeToSpawn];
+            CGFloat radius = [self radiusForBallSize:sizeToSpawn];
+            SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
 
-    // Set up the physics body for the ball
-    ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
-    switch (sizeToSpawn) {
-        case BallSize1: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize1; break;
-        case BallSize2: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize2; break;
-        case BallSize3: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize3; break;
-        case BallSize4: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize4; break;
-        case BallSize5: ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize5; break;
-        // ... and so on for other sizes
+            CGFloat area = M_PI * radius * radius;
+            CGFloat baseDensity = 1.5; // Base density for the smallest ball
+            CGFloat densityMultiplier = 1.0 + (sizeToSpawn - 1) * 0.5; // Increase density for larger balls
+
+            ball.fillColor = [self colorForBallSize:sizeToSpawn];
+            ball.strokeColor = [SKColor blackColor];
+            ball.lineWidth = 1.5;
+            ball.name = [NSString stringWithFormat:@"ball_%lu", (unsigned long)sizeToSpawn];
+
+            ball.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:radius];
+            ball.physicsBody.mass = area * baseDensity * densityMultiplier;
+            ball.physicsBody.categoryBitMask = PhysicsCategoryBallSize1 << (sizeToSpawn - 1);
+            ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
+            ball.physicsBody.contactTestBitMask = ball.physicsBody.categoryBitMask | PhysicsCategoryEdge;
+            ball.physicsBody.dynamic = YES;
+            ball.physicsBody.affectedByGravity = YES;
+            ball.physicsBody.allowsRotation = YES;
+            ball.physicsBody.usesPreciseCollisionDetection = YES;
+
+            // Adjust physics properties based on size
+            if (sizeToSpawn == BallSize1) {
+                ball.physicsBody.friction = 0.5; // Higher friction for rolling
+                ball.physicsBody.restitution = 0.4; // Lower restitution to reduce bounciness
+                ball.physicsBody.linearDamping = 0.2; // Adjust linear damping
+                ball.physicsBody.angularDamping = 0.01; // Adjust angular damping for better rolling
+
+                // Add a small random impulse to size 1 balls when they make contact with the bottom edge
+                __weak typeof(ball) weakBall = ball;
+                ball.physicsBody.contactTestBitMask |= PhysicsCategoryEdge; // Ensure we get notifications for edge contacts
+                ball.physicsBody.collisionBitMask |= PhysicsCategoryEdge; // Collide with the edge
+
+                [ball.physicsBody setContactTestBitMask:PhysicsCategoryEdge];
+                [ball.physicsBody setCollisionBitMask:PhysicsCategoryEdge];
+                [ball.physicsBody setUsesPreciseCollisionDetection:YES];
+                
+                ball.physicsBody.contactTestBitMask = PhysicsCategoryEdge;
+                ball.physicsBody.collisionBitMask = PhysicsCategoryEdge;
+
+            } else {
+                ball.physicsBody.friction = 0.05; // Lower friction
+                ball.physicsBody.restitution = 0.3; // Lower restitution
+                ball.physicsBody.linearDamping = 0.5; // Higher linear damping
+                ball.physicsBody.angularDamping = 0.2; // Higher angular damping
+            }
+
+            ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50);
+            [self addChild:ball];
+        
     }
-    ball.physicsBody.collisionBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
-    ball.physicsBody.contactTestBitMask = PhysicsCategoryBall | PhysicsCategoryEdge;
-    ball.physicsBody.dynamic = YES;
-    ball.physicsBody.affectedByGravity = YES;
-    ball.physicsBody.allowsRotation = YES;
-    ball.physicsBody.friction = 0.1; // Adjust as needed
-    ball.physicsBody.restitution = 0.5; // Adjust as needed
-    ball.physicsBody.linearDamping = 0.5; // Adjust as needed
-    ball.physicsBody.angularDamping = 0.5; // Adjust as needed
-
-    // Position the ball above the slider
-    ball.position = CGPointMake(slider.position.x, slider.position.y + radius + 50); // Adjust Y position as needed
-
-    [self addChild:ball];
 }
 
 
@@ -197,14 +244,15 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     }
 
     NSMutableArray *updatedProbabilities = [NSMutableArray arrayWithCapacity:numUnlockedSizes];
-    double totalProbability = 1.0;
-    double decrementAmount = 0.1; // Adjust this value to control how much less likely larger sizes are
+    
+    // Control the rate of decrease in probability for larger sizes
+    double decrementFactor = 0.5; // Adjust this value to control skewness (smaller value = more skewness)
 
-    // Track probabilities being generated
+    // Generate skewed probabilities
     for (NSUInteger i = 0; i < numUnlockedSizes; i++) {
-        double probabilityForSize = totalProbability - (decrementAmount * i);
+        double probabilityForSize = pow(decrementFactor, i);
         [updatedProbabilities addObject:@(probabilityForSize)];
-        NSLog(@"Generated probability for size %lu: %f", (unsigned long)i, probabilityForSize);
+        NSLog(@"Generated probability for size %lu: %f", (unsigned long)i+1, probabilityForSize);
     }
 
     // Inspect updatedProbabilities before assignment
@@ -220,9 +268,10 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     // Inspect normalized probabilities
     NSLog(@"Probabilities after normalization: %@", updatedProbabilities);
 
-    NSLog(@"Updated ball spawn probabilities: %@", self.ballSpawnProbabilities);
     self.ballSpawnProbabilities = updatedProbabilities;
+    NSLog(@"Updated ball spawn probabilities: %@", self.ballSpawnProbabilities);
 }
+
 
 
 
@@ -283,9 +332,11 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 - (void)didBeginContact:(SKPhysicsContact *)contact {
     SKNode *nodeA = contact.bodyA.node;
     SKNode *nodeB = contact.bodyB.node;
+    SKNode *ballNode = nil;
 
     //NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeA.name, (unsigned long)nodeA.physicsBody.categoryBitMask, (unsigned long)nodeA.physicsBody.contactTestBitMask);
     //NSLog(@"%@: categoryBitMask = %lu, contactTestBitMask = %lu", nodeB.name, (unsigned long)nodeB.physicsBody.categoryBitMask, (unsigned long)nodeB.physicsBody.contactTestBitMask);
+  
 
     if ([self isBall:nodeA] && [self isBall:nodeB] && nodeA.physicsBody.categoryBitMask == nodeB.physicsBody.categoryBitMask) {
 
