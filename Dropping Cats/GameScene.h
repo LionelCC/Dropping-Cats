@@ -24,6 +24,7 @@ typedef NS_ENUM(uint32_t, PhysicsCategory) {
 
 @interface GameScene : SKScene <SKPhysicsContactDelegate>
 
+@property (nonatomic, assign) NSInteger score;
 @property (nonatomic, strong) NSMutableArray *unlockedBallSizes;
 @property (nonatomic, strong) NSArray *ballSpawnProbabilities;
 @property (nonatomic) NSTimeInterval lastSpawnTime;  // New property for cooldown

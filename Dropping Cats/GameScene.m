@@ -34,6 +34,7 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     self.physicsBody = [SKPhysicsBody bodyWithEdgeLoopFromRect:self.frame];
     self.physicsBody.categoryBitMask = 2; // Assuming category 2 for edges
     self.containerHeight = 950.0;
+    self.score = 0;
 
     static const uint32_t PhysicsCategoryBall = 0x1 << 0;
     static const uint32_t PhysicsCategoryEdge = 0x1 << 1;
@@ -52,6 +53,16 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
 
     // ... other initialization code, such as setting up the scene ...
     self.lastSpawnTime = 0;
+    
+    SKLabelNode *scoreLabel = [SKLabelNode labelNodeWithFontNamed:@"Arial"];
+    scoreLabel.name = @"scoreLabel"; // Corrected
+    scoreLabel.fontSize = 40;
+    
+    scoreLabel.position = CGPointMake(CGRectGetMidX(self.frame), self.frame.size.height - 800);
+    scoreLabel.text = @"Current score: 0 pts";
+    [self addChild:scoreLabel];
+    NSLog(@"Screen height: %f", self.frame.size.height);
+    [self setupScoreDisplay]; // Call a method to setup the score display
     
     NSLog(@"GameScene didMoveToView: method called");
     
@@ -294,6 +305,8 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     CGFloat radius = [self radiusForBallSize:size];
     SKShapeNode *ball = [SKShapeNode shapeNodeWithCircleOfRadius:radius];
     NSLog(@"Spawning ball of size: %lu", (unsigned long)size);
+    NSString *imageName = [NSString stringWithFormat:@"apple_%lu", (unsigned long)size]; // Assuming you have apple_1, apple_2, etc.
+   SKSpriteNode *appleNode = [SKSpriteNode spriteNodeWithImageNamed:imageName];
 
     ball.fillColor = [self colorForBallSize:size]; // Use the method to determine color
     ball.strokeColor = [SKColor blackColor];
@@ -428,6 +441,15 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
         case BallSize5: newBall.physicsBody.categoryBitMask = PhysicsCategoryBallSize5; break;
         // ... and so on for other sizes
     }
+    
+    //Update score
+    NSInteger pointsForMerge = newSize - 1;
+    NSLog(@"Merging balls of size %ld, updating score", (long)mergedSize);
+    self.score += pointsForMerge;
+    NSLog(@"Score after merging: %ld", (long)self.score);
+
+    //update score display
+    [self updateScoreDisplay];
 
     // Check if newBall already has a parent
     if (!newBall.parent) {
@@ -442,7 +464,24 @@ static const uint32_t PhysicsCategoryBallSize5 = 0x1 << 5;
     }
 }
 
+- (void)setupScoreDisplay {
+    SKLabelNode *scoreLabel = [SKLabelNode labelNodeWithFontNamed:@"Arial"];
+    scoreLabel.name = @"scoreLabel";
+    scoreLabel.fontSize = 20;
+    scoreLabel.position = CGPointMake(CGRectGetMidX(self.frame), self.frame.size.height - 50);
+    scoreLabel.text = @"Current score: 0 pts";
+    [self addChild:scoreLabel];
+}
 
+- (void)updateScoreDisplay {
+    SKLabelNode *scoreLabel = (SKLabelNode *)[self childNodeWithName:@"scoreLabel"];
+    if (scoreLabel) {
+        scoreLabel.text = [NSString stringWithFormat:@"Current score: %ld pts", (long)self.score];
+        NSLog(@"Score label updated to: %@", scoreLabel.text);
+    } else {
+        NSLog(@"Score label not found!");
+    }
+}
 
 
 

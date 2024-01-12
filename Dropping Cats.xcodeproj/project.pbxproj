@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6231A5EE2B51BBD50054D620 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6231A5ED2B51BBD50054D620 /* Images.xcassets */; };
 		62CA858B2B45F9B800D9A123 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 62CA858A2B45F9B800D9A123 /* AppDelegate.m */; };
 		62CA858D2B45F9B800D9A123 /* GameScene.sks in Resources */ = {isa = PBXBuildFile; fileRef = 62CA858C2B45F9B800D9A123 /* GameScene.sks */; };
 		62CA858F2B45F9B800D9A123 /* Actions.sks in Resources */ = {isa = PBXBuildFile; fileRef = 62CA858E2B45F9B800D9A123 /* Actions.sks */; };
@@ -39,6 +40,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		6231A5ED2B51BBD50054D620 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		62CA85862B45F9B800D9A123 /* Dropping Cats.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Dropping Cats.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		62CA85892B45F9B800D9A123 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		62CA858A2B45F9B800D9A123 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -119,6 +121,7 @@
 				62CA85992B45F9BA00D9A123 /* Assets.xcassets */,
 				62CA859B2B45F9BA00D9A123 /* LaunchScreen.storyboard */,
 				62CA859E2B45F9BA00D9A123 /* main.m */,
+				6231A5ED2B51BBD50054D620 /* Images.xcassets */,
 			);
 			path = "Dropping Cats";
 			sourceTree = "<group>";
@@ -246,6 +249,7 @@
 				62CA85982B45F9B800D9A123 /* Main.storyboard in Resources */,
 				62CA858D2B45F9B800D9A123 /* GameScene.sks in Resources */,
 				62CA859A2B45F9BA00D9A123 /* Assets.xcassets in Resources */,
+				6231A5EE2B51BBD50054D620 /* Images.xcassets in Resources */,
 				62CA859D2B45F9BA00D9A123 /* LaunchScreen.storyboard in Resources */,
 				62CA858F2B45F9B800D9A123 /* Actions.sks in Resources */,
 			);
